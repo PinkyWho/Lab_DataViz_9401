@@ -1,0 +1,24 @@
+{
+    "Authors": [
+        "Tania Yareni Pech-Canul",
+        "Roberto Guajardo",
+        "Luis Fernando Acosta-Soto",
+        "Mónica Sofía Margoya-Constantino",
+        "Juan Pablo Rosado-Aíza",
+        "Luz María Alonso-Valerdi"
+    ],
+    "Name": "NeuroTechs Dataset for Stem Skills",
+    "License": "CC0",
+    "ReferencesAndLinks": [
+        ""
+    ],
+    "BIDSVersion": "1.8.0",
+    "HEDVersion": "8.1.0",
+    "GeneratedBy": [
+        {
+            "Name": "EEG-BIDS",
+            "Version": "10.3"
+        }
+    ],
+    "DatasetDOI": "doi:10.18112/openneuro.ds006803.v1.1.1"
+}

@@ -1,0 +1,21 @@
+{
+  "PowerLineFrequency": 60,
+  "SoftwareFilters": {
+    "FilterDescription": {
+      "Description": "firwin hamming order 830 hp at 1Hz, firwin notch 60 hz width 2Hz default MNE"
+    }
+  },
+  "SoftwareVersions": "Unicorn Suite Hybrid Black Recorder 1.24.01, Unicorn Python API 1.24.00 BETA 2621",
+  "EEGPlacementScheme": "10-20",
+  "EEGReference": "Mastoid",
+  "CapManufacturersModelName": "Unicorn Hybrid Black",
+  "CapManufacturer": "gTec",
+  "InstitutionAddress": "Monterrey México",
+  "InstitutionalDepartmentName": "Escuela de Ingeniería y Ciencias",
+  "InstitutionName": "Tec de Monterrey",
+  "TaskName": "STEMSKILLS",
+  "EEGChannelCount": 8,
+  "RecordingType": "continuous",
+  "RecordingDuration": 1246.064,
+  "SamplingFrequency": 250
+}

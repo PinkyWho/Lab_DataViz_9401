@@ -1,0 +1,8 @@
+---
+title: "Female vs Male, general interpretations of a stemskills dataset"
+author: "Your Name"
+format: 'ascidoc'
+html:
+toc: true
+code-fold: true
+---

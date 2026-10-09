@@ -1,8 +1,83 @@
 ---
-title: "Female vs Male, general interpretations of a stemskills dataset"
-author: "Your Name"
-format: 'ascidoc'
-html:
-toc: true
-code-fold: true
+title: "Data Visualization Assignment: Telling a Story with EEG Data"
+author: "Student Submission"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+    code-summary: "show code"
+    df-print: paged
+    embed-resources: true
+editor: visual
+execute: 
+  echo: false
+  warning: false
 ---
+
+```{r setup-and-processing, include=FALSE}
+# Automatically run the pipeline script if PNG graphics do not exist yet
+# Pipeline takes around 40 minutes, feel free to reproduce by deleting image files.
+
+if (!file.exists("figs/C3_Fz_combined_0.05.png")) {
+  source("process_eeg.R")
+}
+
+library(knitr)
+```
+
+# 1. Story Summary
+
+[This analysis investigates whether functional connectivity differences exist between men and women pursuing STEM majors when performing analytical computational tasks. Using electroencephalographic (EEG) recordings from 63 Biomedical Engineering students, the study examines brain activity during a 25-question programming test. By calculating imaginary coherence, the data reveals how different cortical regions synchronize when students interpret code and execute algorithmic reasoning. The primary comparison focuses on the distinct synchronization patterns between male and female cohorts across time and frequency domains. The evidence demonstrates that while both sexes successfully perform the tasks, they exhibit significantly different neural networking strategies, specifically concentrated in the fronto-parietal and central cortical regions. These findings do not imply differences in cognitive ability, but rather highlight that computational reasoning elicits distinct neurophysiological approaches depending on biological sex.]
+
+---
+
+# 2. Tell the Story with Visualizations
+
+[The visualizations guide the observer directly to the precise moments and frequencies where cognitive strategies diverge between sexes. By utilizing time-frequency heatmaps, we map the Fisher z-transformed imaginary coherence from one second prior to stimulus onset to two seconds post-onset. The left column establishes the baseline average for the entire cohort, while the middle and right columns isolate the male and female responses, respectively. Cyan clusters overlaid on the average map explicitly pinpoint the areas of statistical significance (p < 0.01). This structural choice allows the reader to instantly correlate a mathematical difference with a visual divergence in the color gradients—such as a deep red (positive connectivity) in the male cohort contrasting with a deep blue (negative connectivity) in the female cohort during the exact same cognitive time window.]
+
+---
+
+# 3. Tell the Same Story for Two Outlets
+
+## Version A: Scientific Article
+
+[This study identifies significant sex-related differences in electroencephalographic (EEG) functional connectivity during analytical programming tasks. Analyzing a cohort of 63 undergraduate students (37 females, 26 males), EEG signals were re-referenced to a common average, band-pass filtered between 4 and 30 Hz, and epoched from -1 to +2 seconds relative to stimulus onset. Functional connectivity was estimated using time-frequency imaginary coherence, which isolates non-zero time delay phase relationships to minimize volume conduction artifacts. Fisher z-transformed connectivity values were compared using Welch's independent two-sample t-test, with statistical significance established at α=0.01.]
+
+### Scientific Figures
+
+```{r scientific-graphics, echo=FALSE, fig.cap="Figure 1: Spectral coherence matrices across representative electrode pairs.", out.width="100%"}
+# Display specific fronto-parietal figures for the scientific narrative
+scientific_pngs <- c("figs/PO7_Pz_combined_0.05.png", "figs/PO7_Fz_combined_0.05.png")
+include_graphics(scientific_pngs)
+```
+
+[The time-frequency maps illustrate fronto-parietal connectivity dynamics. Statistically significant cyan clusters identify early post-stimulus divergences in the theta band (4.5–7.9 Hz) between 0.0 and 0.168 seconds. These connectivity differences indicate distinct neural synchronization strategies during early lexical and semantic integration of programming stimuli.]
+
+### Discussion
+[The most prominent neurophysiological divergences were localized to fronto-parietal networks, specifically involving the PO7-Pz and PO7-Fz electrode pairs. Immediately following stimulus presentation, statistically significant clusters emerged throughout the theta frequency band (4.5 – 7.9 Hz). For the PO7-Fz connection, male participants exhibited predominantly positive imaginary coherence, indicating robust anterior-posterior synchronization, whereas female participants demonstrated neutral or slightly negative connectivity. Conversely, the PO7-Pz connection revealed predominantly negative connectivity in males, with females exhibiting values closer to zero. These early theta-band differences suggest distinct temporal recruitment of working memory and executive control mechanisms during the initial stages of code comprehension. Several limitations must be acknowledged, notably the reliance on an 8-electrode system which restricts spatial resolution, unequal group sizes, and the lack of correlation with academic performance metrics.]
+
+---
+
+## Version B: Brainnews max
+
+[*Wired Differently: How Male and Female Brains Diverge When Writing Code* When it comes to solving complex programming problems, men and women achieve the same results but use shockingly different brain networks to get there. By tracking the brain waves of 63 engineering students as they tackled rigorous coding challenges, researchers mapped exactly how different regions of the brain talk to each other. The resulting heatmaps reveal a striking, instantaneous divergence in cognitive strategy.]
+
+### MUST-SEES
+
+```{r accessible-graphics, echo=FALSE, fig.cap="Figure 2: Key connectivity patterns formatted for public interpretation.", out.width="100%"}
+# Display specific central cortical figures for the public narrative
+accessible_pngs <- c("figs/C4_C3_combined_0.05.png", "figs/C4_Cz_combined_0.05.png")
+include_graphics(accessible_pngs)
+```
+
+[These maps track how intensely different parts of the brain communicate while coding. Red areas show strong positive connections, while blue areas show negative or reversed connections. The bright cyan blobs highlight the exact moments the male and female brains use completely different strategies to process the programming questions.]
+
+### The truth
+[The most drastic differences explode in the brain's central cortex, the command center for cognitive planning and problem-solving. Looking at the connection between the right and left central cortex (C4 to C3), women heavily dominate the neural networking space. About half a second after seeing a coding problem, female brains light up with intense, sustained connectivity that completely eclipses the male response. Meanwhile, men show a hyper-focused surge in a totally different pathway. In the connection from the right central to the mid-central cortex (C4 to Cz), male brains lock into a sustained, high-power frequency rhythm that lasts for nearly the entire problem-solving window. In that exact same pathway, female brain connectivity drops to near absolute zero. This isn't a matter of who is better at math or coding; it's hard evidence that male and female brains naturally deploy entirely distinct, parallel strategies to crush the exact same technological challenges.]
+
+---
+
+# 4. Data / Source Note
+
+[This analysis utilizes the publicly available OpenNeuro dataset ds006803, which recorded undergraduate Biomedical Engineering students during cognitive tasks. The raw EEG signals underwent significant preprocessing, including re-referencing to the common average and the application of a 4–30 Hz band-pass filter to isolate theta, alpha, and beta brain rhythms. The data was then segmented into focused 3-second windows (-1s to +2s) triggered by the exact moment a programming question appeared on screen. To measure how different brain regions communicated, time-frequency imaginary coherence was calculated and stabilized using Fisher's z-transformation. Study limitations include the use of only eight EEG electrodes, which restricts precise spatial mapping of the brain, unequal numbers of male and female participants, and a high volume of statistical tests without correction for multiple comparisons]

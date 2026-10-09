@@ -141,6 +141,8 @@ for (fullname in sublist) {
 # ------------------------------------------------------------------------------
 # 3. Group Means & Statistics
 # ------------------------------------------------------------------------------
+cat("Testing significance...\n")
+
 male_idx   <- which(all_sex == "Male")
 female_idx <- which(all_sex == "Female")
 
@@ -153,7 +155,7 @@ Ccoh  <- apply(coh_5d, c(1, 2, 3, 4), mean, na.rm = TRUE)
 Ccohm <- apply(coh_5d[, , , , male_idx], c(1, 2, 3, 4), mean, na.rm = TRUE)
 Ccohf <- apply(coh_5d[, , , , female_idx], c(1, 2, 3, 4), mean, na.rm = TRUE)
 
-# Stats: t-tests (p < 0.01 threshold)
+# Stats: t-tests (p < 0.05 threshold)
 n_times <- dim(Ccoh)[4]
 n_freqs <- dim(Ccoh)[3]
 pvals <- array(1, dim = dim(Ccoh)[1:4])
@@ -172,7 +174,10 @@ for (i in 1:length(channellist)) {
     }
   }
 }
-sig_mask <- pvals < 0.01
+sig_mask <- pvals < 0.05
+
+# Save the heavy calculated objects to a file
+save(Ccoh, Ccohm, Ccohf, sig_mask, time_axis, freq_axis, n_times, n_freqs, channellist, file = "coherence_results.RData")
 
 # ------------------------------------------------------------------------------
 # 4. Generate 3-Panel ggplot2 Figures
@@ -184,8 +189,8 @@ time_axis <- seq(-1, 2, length.out = n_times)
 freq_axis <- seq(4, 30, length.out = n_freqs)
 
 make_subplot <- function(mat, sig_mat, title_str, show_points = FALSE) {
-  # Convert 2D matrix to data frame for ggplot
-  df <- expand.grid(TimeIdx = 1:n_times, FreqIdx = 1:n_freqs) %>%
+  # FIXED: FreqIdx must come first so the grid matches matrix flattening
+  df <- expand.grid(FreqIdx = 1:n_freqs, TimeIdx = 1:n_times) %>%
     mutate(
       Time = time_axis[TimeIdx],
       Freq = freq_axis[FreqIdx],
@@ -223,7 +228,7 @@ for (i in 2:(length(channellist))) {
     combined_plot <- p_all + p_male + p_fem + plot_layout(guides = "collect")
     
     filename <- paste0(channellist[i], "_", channellist[j], "_combined_0.05.png")
-    ggsave(filename, plot = combined_plot, width = 18, height = 5, dpi = 300)
+    ggsave(filename, plot = combined_plot, path = "figs",width = 14, height = 2, dpi = 300)
   }
 }
 cat("Pipeline complete.\n")

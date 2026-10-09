@@ -1,19 +1,46 @@
 # ==============================================================================
-# Pure R EEG Processing & Coherence Pipeline
+# R EEG Processing & Coherence Pipeline (Using MNE via Reticulate)
 # ==============================================================================
+
+library(reticulate)
+
+# Specify python version to use. Originally ran with Python 3.9
+# 1. Define local venv path in your working directory
+venv_dir <- file.path(getwd(), "r_eeg_env")
+
+# 2. Create the environment if it doesn't exist yet
+if (!virtualenv_exists(venv_dir)) {
+  cat("Creating new R-dedicated virtual environment...\n")
+  virtualenv_create(envname = venv_dir)
+  
+  # 3. Install required Python dependencies into this environment
+  cat("Installing required Python packages (mne, mne-connectivity, numpy, scipy)...\n")
+  virtualenv_install(
+    envname = venv_dir,
+    packages = c("mne", "mne-connectivity", "numpy", "scipy", "h5py", "pandas"),
+    ignore_installed = FALSE
+  )
+}
+
+# 4. Lock reticulate to this specific virtual environment
+use_virtualenv(venv_dir, required = TRUE)
 
 library(readxl)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(patchwork)
-# eegUtils processes raw EEGLAB .set/.fdt files natively in R
-# If needed, install via: remotes::install_github("craddm/eegUtils")
-library(eegUtils)
 
 # ------------------------------------------------------------------------------
-# 1. Subject Definitions & Global Parameters
+# 1. Setup Python Environment & Parameters (No native R Coherence method)
 # ------------------------------------------------------------------------------
+
+# Import Python modules into R
+mne <- import("mne")
+mne_conn <- import("mne_connectivity")
+np <- import("numpy")
+
+# Editable to remove more outliers if need be
 sublist <- c(
   "sub-01c","sub-02c","sub-03c","sub-04c","sub-05c","sub-06c","sub-07c","sub-08c",
   "sub-09c","sub-10c","sub-11c","sub-12c","sub-13c","sub-14c","sub-15c","sub-16c",
@@ -27,84 +54,113 @@ sublist <- c(
 
 channellist <- c("Fz", "C3", "Cz", "C4", "Pz", "PO7", "Oz", "PO8")
 fs <- 250
-times <- seq(-1, 2, length.out = 750) # -1s to 2s epoch at 250Hz
-freqs <- seq(4, 30, by = 0.5)
+freqs <- seq(4, 30, by = 0.1) # 4 to 30 Hz
+n_cycles <- freqs / 2         # Time-frequency tradeoff
 
-# Read metadata sheet using relative path
-metadata_path <- file.path("NeuroTechs Dataset for Stem Skills", "extra_metadata.xlsx")
-metad <- read_excel(metadata_path, sheet = "Individual metadata")
+# Convert R vectors to explicit NumPy arrays for MNE compatibility
+freqs_np <- np$array(freqs)
+n_cycles_np <- np$array(n_cycles)
+
+# Read metadata
+metad <- read_excel("NeuroTechs Dataset for Stem Skills/extra_metadata.xlsx", sheet = "Individual metadata")
 
 all_coh <- list()
 all_sex <- c()
 all_age <- c()
 
 # ------------------------------------------------------------------------------
-# 2. Iterate Subjects & Compute Fisher Z Coherence
+# 2. Iterate Subjects, Epoch, and Compute Coherence
 # ------------------------------------------------------------------------------
-cat("Beginning processing of raw EEG datasets...\n")
+cat("Beginning processing...\n")
 
 for (fullname in sublist) {
-  cat("Processing subject:", fullname, "\n")
+  cat("Processing:", fullname, "\n")
   
-  # Retrieve metadata
+  # Metadata
   sub_row <- metad %>% filter(row_number() == match(fullname, metad[[1]]))
   if (nrow(sub_row) == 0) next
-  sex_val <- sub_row$`AAB Sex`[1]
-  age_val <- sub_row$Age[1]
+  age <- sub_row$Age[1]   
+  sex <- sub_row$`AAB Sex`[1]
   
-  # Construct relative file paths
+  # Paths
   events_file <- file.path("NeuroTechs Dataset for Stem Skills", fullname, "programming_responses.csv")
   eeg_file    <- file.path("NeuroTechs Dataset for Stem Skills", fullname, "ses-1", "eeg", paste0(fullname, "_ses-1_task-STEMSKILLS_eeg.set"))
+  chan_file   <- file.path("NeuroTechs Dataset for Stem Skills", fullname, "ses-1", "eeg", paste0(fullname, "_ses-1_electrodes.tsv"))
   
   if (file.exists(eeg_file) && file.exists(events_file)) {
-    events <- read.csv(events_file)
-    question_appearance <- events[, 2] - 3
+    # Read events and filter
+    events_df <- read.csv(events_file)
+    question_appearance <- events_df[, 3] - 3 # - 3 because event timeline is off by 3 seconds from the preprocessing pipeline
     
-    # Filter valid epoch intervals (time difference >= 2s)
+    # Questions that were answered in less than 2 seconds are not considered
     diffs <- diff(question_appearance)
     valid_mask <- c(TRUE, diffs >= 2)
     filtered_times <- question_appearance[valid_mask]
+    event_samples <- as.integer(filtered_times * fs)
     
-    # Process raw EEG file
-    raw_eeg <- import_raw(eeg_file)
+    # Create MNE-compatible event matrix in R
+    mne_events <- cbind(event_samples, integer(length(event_samples)), rep(1L, length(event_samples)))
+    storage.mode(mne_events) <- "integer" # MNE requires strictly integers
     
-    # Calculate channel pair imaginary coherence array: [chans, chans, freqs, times]
-    n_chans <- length(channellist)
-    n_freqs <- length(freqs)
-    n_times <- length(times)
+    # Load and preprocess raw EEG via MNE
+    raw <- mne$io$read_raw_eeglab(eeg_file, preload = TRUE, verbose = FALSE)
+    montage <- mne$channels$read_custom_montage(chan_file)
+    raw$set_eeg_reference('average', verbose = FALSE)
+    raw$filter(4, 30, verbose = FALSE)
     
-    # Perform Fisher Z arctanh transformation on clipped coherence values [-0.999999, 0.999999]
-    coh_matrix <- array(runif(n_chans * n_chans * n_freqs * n_times, -0.2, 0.2), 
-                        dim = c(n_chans, n_chans, n_freqs, n_times))
+    # Epoch data (-1 to 2 seconds)
+    epochs <- mne$Epochs(raw, mne_events, event_id = 1L, tmin = -1, tmax = 2, verbose = FALSE)
     
-    all_coh[[length(all_coh) + 1]] <- coh_matrix
-    all_sex <- c(all_sex, sex_val)
-    all_age <- c(all_age, age_val)
+    # Calculate Coherence (Python mne)
+    con <- mne_conn$spectral_connectivity_epochs(
+      epochs,
+      method = 'imcoh',
+      mode = 'cwt_morlet',
+      sfreq = fs,
+      cwt_freqs = freqs_np,
+      cwt_n_cycles = n_cycles_np,
+      fmin = 4,
+      fmax = 30,
+      tmin = -1.0,
+      verbose = FALSE
+    )
+    
+    # Extract dense array back into R environment
+    con_dense <- con$get_data(output = 'dense')
+    
+    # Clip and Fisher Z Transform (1's and 0's are disregarded)
+    con_dense <- pmax(pmin(con_dense, 0.999999), -0.999999)
+    con_dense_z <- atanh(con_dense)
+    
+    all_coh[[length(all_coh) + 1]] <- con_dense_z
+    all_sex <- c(all_sex, sex)
+    all_age <- c(all_age, age)
   }
 }
 
 # ------------------------------------------------------------------------------
-# 3. Group Means & Pixel-Wise T-Tests
+# 3. Group Means & Statistics
 # ------------------------------------------------------------------------------
 male_idx   <- which(all_sex == "Male")
 female_idx <- which(all_sex == "Female")
 
-n_subs  <- length(all_coh)
-n_chans <- length(channellist)
-n_freqs <- length(freqs)
-n_times <- length(times)
+# Stack into 5D array: [Channel, Channel, Freq, Time, Subject]
+# Note: Python shapes come into R slightly differently. MNE's dense output is [Ch, Ch, Freq, Time]
+coh_5d <- array(unlist(all_coh), dim = c(dim(all_coh[[1]]), length(all_coh)))
 
-coh_5d <- array(unlist(all_coh), dim = c(n_chans, n_chans, n_freqs, n_times, n_subs))
-
-# Mean matrices across groups
+# Averages across subjects
 Ccoh  <- apply(coh_5d, c(1, 2, 3, 4), mean, na.rm = TRUE)
 Ccohm <- apply(coh_5d[, , , , male_idx], c(1, 2, 3, 4), mean, na.rm = TRUE)
 Ccohf <- apply(coh_5d[, , , , female_idx], c(1, 2, 3, 4), mean, na.rm = TRUE)
 
-# Pixel-wise independent t-tests (Male vs Female)
-pvals <- array(1, dim = c(n_chans, n_chans, n_freqs, n_times))
-for (i in 1:n_chans) {
-  for (j in 1:n_chans) {
+# Stats: t-tests (p < 0.01 threshold)
+n_times <- dim(Ccoh)[4]
+n_freqs <- dim(Ccoh)[3]
+pvals <- array(1, dim = dim(Ccoh)[1:4])
+
+for (i in 1:length(channellist)) {
+  for (j in 1:length(channellist)) {
+    if (i == j) next # Skip self-coherence
     for (f in 1:n_freqs) {
       for (t in 1:n_times) {
         m_vals <- coh_5d[i, j, f, t, male_idx]
@@ -116,52 +172,58 @@ for (i in 1:n_chans) {
     }
   }
 }
-
 sig_mask <- pvals < 0.01
 
 # ------------------------------------------------------------------------------
 # 4. Generate 3-Panel ggplot2 Figures
 # ------------------------------------------------------------------------------
-cat("Rendering and saving ggplot2 figures to project directory...\n")
+cat("Rendering plots...\n")
+
+# Recreate time and frequency axes based on final matrix dimensions
+time_axis <- seq(-1, 2, length.out = n_times)
+freq_axis <- seq(4, 30, length.out = n_freqs)
 
 make_subplot <- function(mat, sig_mat, title_str, show_points = FALSE) {
+  # Convert 2D matrix to data frame for ggplot
   df <- expand.grid(TimeIdx = 1:n_times, FreqIdx = 1:n_freqs) %>%
     mutate(
-      Time = times[TimeIdx],
-      Freq = freqs[FreqIdx],
-      Coherence = mat[cbind(FreqIdx, TimeIdx)],
-      Sig = sig_mat[cbind(FreqIdx, TimeIdx)]
+      Time = time_axis[TimeIdx],
+      Freq = freq_axis[FreqIdx],
+      Coherence = as.vector(mat),
+      Sig = as.vector(sig_mat)
     )
   
   p <- ggplot(df, aes(x = Time, y = Freq, fill = Coherence)) +
-    geom_raster() +
+    geom_raster(interpolate = TRUE) +
     scale_fill_distiller(palette = "RdBu", limits = c(-0.2, 0.2), oob = scales::squish) +
     labs(title = title_str, x = "Time (s)", y = "Frequency (Hz)", fill = "Coherence") +
     theme_minimal() +
     theme(
-      plot.title = element_text(size = 9, face = "bold"),
-      axis.title = element_text(size = 8)
-    )
+      plot.title = element_text(size = 10, face = "bold"),
+      axis.title = element_text(size = 9)
+    ) +
+    coord_cartesian(expand = FALSE)
   
   if (show_points) {
     p <- p + geom_point(data = filter(df, Sig == TRUE), 
-                        aes(x = Time, y = Freq), color = "cyan", size = 0.3)
+                        aes(x = Time, y = Freq), color = "cyan", size = 0.5, alpha = 0.7)
   }
   return(p)
 }
 
-for (i in 1:n_chans) {
-  for (j in 1:n_chans) {
+# Plot all electrode pairs
+for (i in 2:(length(channellist))) {
+  for (j in 1:(i - 1)) { 
+    
     p_all  <- make_subplot(Ccoh[i, j, , ], sig_mask[i, j, , ], paste0(channellist[i], " to ", channellist[j], " (All)"), show_points = TRUE)
     p_male <- make_subplot(Ccohm[i, j, , ], sig_mask[i, j, , ], paste0(channellist[i], " to ", channellist[j], " (Male)"))
     p_fem  <- make_subplot(Ccohf[i, j, , ], sig_mask[i, j, , ], paste0(channellist[i], " to ", channellist[j], " (Female)"))
     
-    # Assemble subplots side-by-side using Patchwork
+    # Assemble side-by-side using Patchwork, sharing one colorbar!
     combined_plot <- p_all + p_male + p_fem + plot_layout(guides = "collect")
     
     filename <- paste0(channellist[i], "_", channellist[j], "_combined_0.05.png")
-    ggsave(filename, plot = combined_plot, width = 16, height = 4.5, dpi = 300)
+    ggsave(filename, plot = combined_plot, width = 18, height = 5, dpi = 300)
   }
 }
-
-cat("Pipeline complete. All graphics created successfully.\n")
+cat("Pipeline complete.\n")

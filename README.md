@@ -1,7 +1,7 @@
 # INSTRUCTIONS
 
 Feel free to load the finished website in the following link:
-__
+https://pinkywho.github.io/Lab_DataViz_9401/
 
 For reproduction and analysis, download everything into a new Rproj 
 

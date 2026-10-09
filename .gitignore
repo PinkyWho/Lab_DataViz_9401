@@ -4,3 +4,4 @@
 .Ruserdata
 *.RData
 /.quarto/
+r_eeg_env/

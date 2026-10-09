@@ -4,7 +4,7 @@ Feel free to load the finished website in the following link:
 __
 
 For reproduction and analysis, download everything into a new Rproj 
-(exclude .Rproj, docs, .RData, and r_eeg_env, as these are created when creating a new Rproj and rendering the qmd)
+(exclude .Rproj, docs, and r_eeg_env, as these are created when creating a new Rproj and rendering the qmd)
 Empty figs folder, keep the directory itself
 
 Requirements:
